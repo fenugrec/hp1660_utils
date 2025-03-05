@@ -1,5 +1,5 @@
 #! python
-# 'port' of IALDOWN.EXE for python (probaby python2)
+# 'port' of IALDOWN.EXE for python (probaby python2) by user sleary78
 # https://www.eevblog.com/forum/testgear/hp-logic-analyzer-inverse-assemblers/25/
 
 import sys
@@ -22,12 +22,12 @@ tn = telnetlib.Telnet(hostname, port)
 
 params = {}
 
-params['filename'] = raw_input("Logic Analyzer Filename = ").rstrip()
-params['description'] = raw_input("Logic Analyzer File Description\n(must be 32 characters or less) = ").rstrip()
-params['rfile'] = raw_input("Relocatable File on the PC = ").rstrip()
+params['filename'] = input("Logic Analyzer Filename = ").rstrip()
+params['description'] = input("Logic Analyzer File Description\n(must be 32 characters or less) = ").rstrip()
+params['rfile'] = input("Relocatable File on the PC = ").rstrip()
 # ignored but here for compatibility with scripts
-params['comport'] = raw_input("COM Port (Ignored) = ").rstrip()
-params['option'] = raw_input(""""Invasm" Field Options:
+params['comport'] = input("COM Port (Ignored) = ").rstrip()
+params['option'] = input(""""Invasm" Field Options:
  A = No "Invasm" Field
  B = "Invasm" Field with no pop-up
  C = "Invasm" Field with pop-up. 2 choices in pop-up.
@@ -35,7 +35,7 @@ params['option'] = raw_input(""""Invasm" Field Options:
 Select the appropriate letter (A, B, C or D)""").rstrip()
 
 if len(params['description']) > 32:
-    print "Description too long will be trimmed"
+    print("Description too long will be trimmed")
 
 # read the data file
 with open(params['rfile'], 'rb') as f:
