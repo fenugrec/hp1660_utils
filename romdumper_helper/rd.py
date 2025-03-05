@@ -4,22 +4,24 @@
 #
 # script to aid in dumping ROMs in-situ, while host device is running.
 #
-# this particular one is for this setup :
+# this particular script is for the following setup :
 #
-# fluke 2640 netdaq A1 main pcb
+# - HP 1660C
+# - fluke 2640 netdaq A1 main pcb
 # 	- mc68302
 # 	- 28F400B5 (4Mbit, 512kB; 256k*16bit) (0-0x7f ffff)
 # its flash is wired as a 16-bit wide bus; address 0 is not relevant for access into flash area.
 # 
-# The strategy is to load the correct config on the hp1660 manually, then use this script to automate
-# 	- setting up trigger
-# 	- retrieving data for a 'section'
-# 	- preparing next trigger
-# 	- reset 2640
-# 	- repeat
-# 
-# In half-channel mode, I can do 8k records at a time.
-# 
+'''
+The strategy is to load the correct config on the hp1660 manually, then use this script to automate
+	- setting up trigger
+	- retrieving data for a 'section'
+	- preparing next trigger
+	- reset 2640
+	- repeat
+
+In half-channel mode, the 1660C can do 8k records per trace, i.e. 16kB of ROM data.
+
 The 2640 is controlled via the 'netdaq' python library.
 Triggering the SelfTest routine should cause the checksum code to run again over the entire ROM
 
@@ -46,3 +48,24 @@ retrieve raw data, hope I can find a parser for this shit.
 	# select LA module
 	:sel 1
 	:syst:data?
+'''
+from asyncio import run
+
+# this requries symlink or git submodule i.e. "netdaq/lib/netdaq.py"
+import netdaq.lib.netdaq as ndq
+
+async def main():
+	ndq_ip="192.168.2.40"
+	targ=ndq.NetDAQ(ip=ndq_ip, port=4369)
+
+	await targ.connect()
+
+	try:
+		await targ.ping()
+		print("Version info", await targ.get_version_info())
+
+	finally:
+		print("Disconnecting from netdaq")
+		await targ.close()
+
+run(main())
