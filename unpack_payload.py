@@ -2,6 +2,7 @@
 # (c) fenugrec 2023
 
 # assumes file already has the HPFSLIF header (0x200 bytes) stripped.
+# file should look like repeated blocks of "00 FE <254 bytes of fw data>"
 
 
 
@@ -23,18 +24,18 @@ def extract_blocks(fname, out_file):
 			#possible last-block marker ? it may be part 
 			if (block_len == 0xffff):
 				remaining_payload = mm.size() - f_pos - 2
-				print("lastblock ? {} more bytes; previous block {}".format(remaining_payload, last_len))
+				print("lastblock ? {:#x} more bytes; previous block {:#x}".format(remaining_payload, last_len))
 				block_len = remaining_payload
 
 			if (block_len != 0xfe):
-				print("irregular block @ fileoffs {}: +{}".format(f_pos, block_len))
+				print("irregular block @ fileoffs {:#x}: +{:#x}".format(f_pos, block_len))
 
 			outf.write(mm[f_pos+2 : f_pos+2+block_len])
 			pl_len += block_len
 			f_pos += 2 + block_len
 			last_len = block_len
 
-		print("Payload size: {}, filesize {}, last pos {}".format(pl_len, mm.size(), f_pos))
+		print("Payload size: {:#x}, filesize {:#x}, last pos {:#x}".format(pl_len, mm.size(), f_pos))
 	return
 
 # Format : "XX YY <byte_0> <byte...> <byte_n>", where n = XXYY - 1 (block length is big-endian and refers to actual payload data)
@@ -52,16 +53,16 @@ def list_blocks(fname):
 		#possible last-block marker ? it may be part 
 		if (block_len == 0xffff):
 			remaining_payload = mm.size() - f_pos - 2
-			print("lastblock ? {} more bytes; previous block {}".format(remaining_payload, last_len))
+			print("lastblock ? {:#x} more bytes; previous block {:#x}".format(remaining_payload, last_len))
 			block_len = remaining_payload
 
 		if (block_len != 0xfe):
-			print("irregular block @ fileoffs {}: +{}".format(f_pos, block_len))
+			print("irregular block @ fileoffs {:#x}: +{:#x}".format(f_pos, block_len))
 		pl_len += block_len
 		f_pos += 2 + block_len
 		last_len = block_len
 
-	print("Payload size: {}, filesize {}, last pos {}".format(pl_len, mm.size(), f_pos))
+	print("Payload size: {:#x}, filesize {:#x}, last pos {:#x}".format(pl_len, mm.size(), f_pos))
 #	path.joinpath('patched').mkdir(exist_ok=1)
 
 	return
