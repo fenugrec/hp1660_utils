@@ -35,37 +35,45 @@ LA setup requirements:
 *** misc useful commands
 :system:dsp 'generic GUI message'
 
-set sequence level 1 to count 65535 times before proceeding ? untested
+set sequence level 1 to count 65535 times before proceeding ? -> doesnt work as wanted
 	:mach1:str:find0 'anystate|nostate',65535
 
 set recognizer term B
-	:mach1:str:term b,'BLK_START',0xF000
+	:mach1:str:term b,'BLK_START','#H08f00'
 
 retrieve raw data, hope I can find a parser for this shit.
 	:syst
-	header on
-	longform 1
+	header off
+#	longform 1
 	# select LA module
 	:sel 1
 	:syst:data?
+response:
+#800204976DATA <binary garbage>
+
 '''
-from asyncio import run
 
 # this requries symlink or git submodule i.e. "netdaq/lib/netdaq.py"
 import netdaq.lib.netdaq as ndq
+import time
 
-async def main():
-	ndq_ip="192.168.2.40"
+# doesn't really work, ROM check doesn't seem to be triggered at all
+async def reset_target_soft():
+	ndq_ip="192.168.3.40"
 	targ=ndq.NetDAQ(ip=ndq_ip, port=4369)
 
 	await targ.connect()
 
 	try:
 		await targ.ping()
-		print("Version info", await targ.get_version_info())
+		print("connected to:", await targ.get_version_info())
+		print("sending SelfTest request")
+		await targ.selftest()
 
 	finally:
 		print("Disconnecting from netdaq")
 		await targ.close()
+
+def get_rawdata():
 
 run(main())
