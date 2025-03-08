@@ -24,7 +24,7 @@ la.read_termination='\n'
 print(la.query('*idn?'))
 
 
-# retrieve current color settings
+# retrieve current color settings. color 'number' is from 1 to 7
 def get_colors (instr):
     cols=[]
     for cn in range(1,8):
@@ -35,10 +35,15 @@ def get_colors (instr):
 def set_colors (instr, newcolors):
     for cn in range(1,8):
         ri=cn - 1
-        instr.write(f":setc {ri},"
+        instr.write(f":setc {cn},"
             f"{newcolors[ri][1]},"
             f"{newcolors[ri][2]},"
             f"{newcolors[ri][3]}")
+
+# set all colors to darkest. Save the phosphors
+def set_darkmode (instr):
+    for cn in range(1,8):
+        instr.write(f":setc {cn},0,0,0")
 
 # from https://github.com/joukos/ghettoib , hopefully not necessary as pyvisa should parse this
 def readblock (ifc, timeout = 0.5):
