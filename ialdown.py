@@ -1,6 +1,8 @@
 #! python
-# 'port' of IALDOWN.EXE for python (probaby python2) by user sleary78
+# 'port' of IALDOWN.EXE for python2 by user sleary78
 # https://www.eevblog.com/forum/testgear/hp-logic-analyzer-inverse-assemblers/25/
+# updated to work on python3, but you need special 'telnetlib-313-and-up' compatibility package
+# note, the HP LA is not really proper telnet servers
 
 import sys
 import telnetlib
