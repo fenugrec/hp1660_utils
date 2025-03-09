@@ -45,29 +45,71 @@ def set_darkmode (instr):
     for cn in range(1,8):
         instr.write(f":setc {cn},0,0,0")
 
-# test : stupid loop reading all lines.
+# stupid loop reading a chunk of data one line at a time...
+#
 # with proper triggering, HP line # would be 0...<2^n-1> e.g. 0-4095 or 0-8191 ;
 # n is # of lines to expect = 2^n
 # reply to query looks like '4095,"DATA  ","#H0008"'
-def get_lines (instr, cnt, datawidth=2):
-    lines=[]
-    last_addr = -1
+#
+# returns [[chunk0_start,b'...chunkdata..'],[chunk1_start...
+def get_chunk (instr, cnt, datawidth=2):
+    chunklist=[]
+    chunk_start = None
+    chunkdata = None
+    last_addr = None
+    numbytes = 0
     for ln in range(0,cnt):
         addr_text=instr.query(f":mach1:slist:data? {ln},'ADDR'")
-        # this parsing can probably be improved; can't believe pyvisa has nothing to help us here.
+        # this parsing can probably be improved; can't believe pyvisa has nothing to help us here?
         # query_ascii_values() almost works but uses the same formatter for all fields ?
         addr=int(addr_text.split(',')[2].strip('"#H'),16)
 
         data_text=instr.query(f":mach1:slist:data? {ln},'DATA'")
         data=int(data_text.split(',')[2].strip('"#H'),16)
 #        print(f"a {addr:#x}, d={data:#x}")
+        if chunk_start is None:
+            #first loop only
+            chunk_start = addr
+            chunkdata = (data.to_bytes(datawidth))
+            last_addr = addr - 2
 
-        if addr != (last_addr + datawidth):
-                 print(f"discontinuity from {last_addr:#x} to {addr:#x}")
-        lines.append([addr, data])
+        if addr == (last_addr + datawidth):
+            chunkdata = chunkdata + (data.to_bytes(datawidth))
+        else:
+            print(f"discontinuity from {last_addr:#x} to {addr:#x}")
+            chunklist.append([chunk_start, chunkdata])
+            chunk_start = addr
+            chunkdata = (data.to_bytes(datawidth))
         last_addr = addr
-    print(f"read {len(lines):#x} lines")
-    return lines
+        numbytes += datawidth
+    print(f"read {numbytes:#x} bytes")
+    chunklist.append([chunk_start, chunkdata])
+    return chunklist
+
+# extract data
+def dumploop (instr, start_addr, cnt, capture_depth, datawidth=2, timeout=5000):
+    ca = start_addr
+    chunks = []
+    while cnt > 0:
+        cap = min(cnt, capture_depth)
+        instr.write(f":mach1:str:term b,'ADDR','#H{ca:x}'")
+        instr.write('*cls')
+        instr.write(':start')
+        # TODO : implement timeout + polling status + aborting beyond timeout
+        while 1:
+            esr = int(instr.query('mesr1?'))
+            # bit 0 should be set when done
+            if esr & 1: break
+            # instr.write(':stop')
+            time.sleep(0.2)
+        chunks.append(get_chunk(instr, cap, datawidth))
+        cnt -= cap
+
+def write_chunks (fname, chunks):
+    with open(fname, "wb") as f:
+        for chunk in chunks:
+            f.write(chunk[1])
+
 
 # from https://github.com/joukos/ghettoib , hopefully not necessary as pyvisa should parse this
 def readblock (ifc, timeout = 0.5):

@@ -29,7 +29,24 @@ The LA is controlled over telnet with SCPI commands (could also work over rs232)
 
 LA setup requirements:
 	- trigger definition must be complete and functional, saving only the ROM fetch data, no opcodes
-	- trigger term D will be used to last cycle before the ROM fetch, e.g.
+	- trigger term B is the first address we want to dump
+	- trigger term C is the last opcode fetch before the ROM fetch; 82EBA in the example below
+	e.g.
+		082EBA  <some opcode fetch here, part of some kind of MOV op>
+		000000  <this is the data fetch @ address 0 that we need>
+		082EBC  <some later code part of a short loop>
+		082EBE
+		...
+		082EBA
+		000002  <reading next location for checksum>
+	
+	term B will be set by the script and incremented on every capture
+	term C will not be modified
+	The trigger setup must produce a listing that is exclusively the data fetches, e.g.
+	line	ADDR	DATA
+	0	0000	FFFF
+	1	0002	0000
+	2	0004	......
 
 
 *** misc useful commands
