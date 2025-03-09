@@ -45,6 +45,30 @@ def set_darkmode (instr):
     for cn in range(1,8):
         instr.write(f":setc {cn},0,0,0")
 
+# test : stupid loop reading all lines.
+# with proper triggering, HP line # would be 0...<2^n-1> e.g. 0-4095 or 0-8191 ;
+# n is # of lines to expect = 2^n
+# reply to query looks like '4095,"DATA  ","#H0008"'
+def get_lines (instr, cnt, datawidth=2):
+    lines=[]
+    last_addr = -1
+    for ln in range(0,cnt):
+        addr_text=instr.query(f":mach1:slist:data? {ln},'ADDR'")
+        # this parsing can probably be improved; can't believe pyvisa has nothing to help us here.
+        # query_ascii_values() almost works but uses the same formatter for all fields ?
+        addr=int(addr_text.split(',')[2].strip('"#H'),16)
+
+        data_text=instr.query(f":mach1:slist:data? {ln},'DATA'")
+        data=int(data_text.split(',')[2].strip('"#H'),16)
+#        print(f"a {addr:#x}, d={data:#x}")
+
+        if addr != (last_addr + datawidth):
+                 print(f"discontinuity from {last_addr:#x} to {addr:#x}")
+        lines.append([addr, data])
+        last_addr = addr
+    print(f"read {len(lines):#x} lines")
+    return lines
+
 # from https://github.com/joukos/ghettoib , hopefully not necessary as pyvisa should parse this
 def readblock (ifc, timeout = 0.5):
 		"""Read definite-length block data from instrument.
