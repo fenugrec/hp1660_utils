@@ -104,30 +104,43 @@ def dumploop (instr, start_addr, cnt, capture_depth, datawidth=2, timeout=5000):
             time.sleep(0.2)
         chunks.append(get_chunk(instr, cap, datawidth))
         cnt -= cap
+    return chunks
 
 def write_chunks (fname, chunks):
     with open(fname, "wb") as f:
         for chunk in chunks:
             f.write(chunk[1])
 
+# maybe parse raw data according to dev config
+def parse_raw(instr, rd):
+# instr.query(':mach1:sfor:label? "ADDR"')
+# returns something like '"ADDR  ",POSITIVE,0,0,3840,65535'
+# where the numeric fields are <clock_bits>,<bitmask>,<bitmask>...
+# and each bitmask applies to a pod ; matches left-to-right ordering of Format display
 
-# from https://github.com/joukos/ghettoib , hopefully not necessary as pyvisa should parse this
-def readblock (ifc, timeout = 0.5):
-		"""Read definite-length block data from instrument.
-		Response is in the form '#<number of digits in block length><block length><data>',
-		for example "#800000075<75 bytes of data>", where '#8' means the next 8 digits represent
-		the length of the block, ie. 00000075 = 75 bytes.
-		"""
-		blockpound = self.serialport.read(1) # read block header
-		data = ""
-		if blockpound == '#':
-			numdigits = int(self.serialport.read())
-			numdata = int(self.serialport.read(numdigits))
-			self.dbg("Receiving block of " + str(numdata) + " bytes", "cyan")
-			data = self.serialport.read(numdata)
-			self.dbg("Received " + str(len(data)) + " bytes.", "cyan")
-		self.serialport.timeout=self.timeout
-		if not data:
-			self.dbg("Didn't receive anything.", "yellow")
-		self.serialport.flushInput() # for eating extra newlines and such (upload_query...)
-		return data
+# am=instr.query(':mach1:sfor:label? "ADDR"').split(',')[3:]
+# amask = list(map(int,am))
+
+
+# attempt to get raw data
+def get_rawdata(instr):
+    # for some reason pyvisa query* functions choke on blockdata. this doesn't help
+#    ot=instr.read_termination()
+#    instr.read_termination = ''
+#    instr.read_termination = ot
+    instr.write(':syst:data?')
+    marker = instr.read_bytes(1)
+    if marker != b'#':
+        print(f"no # marker, got {marker}")
+        return
+    ndig = int(instr.read_bytes(1))
+    datalen = int(instr.read_bytes(ndig))
+#    print('expecting {datalen:#x} bytes')
+    rawdata = instr.read_bytes(datalen)
+    #purge trailing '\n'
+    crumb = instr.read_bytes(1)
+    if crumb != b'\n':
+        print(f"didnt get expected trailing LF, got {crumb}")
+    return rawdata
+
+
