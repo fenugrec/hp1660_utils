@@ -195,7 +195,9 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
         sample=int.from_bytes(rawsample)
         addr=unshift_rawdata(sample, addr_mask)
         data=unshift_rawdata(sample, data_mask)
-        print(f"@ {addr:X}: {data:X} ({sample:X})")
+        if not (addr & 0xff):
+            print(f"@ {addr:X}: {data:X}...")
+            #print(f"@ {addr:X}: {data:X} ({sample:X})")
         if chunk_start is None:
             #first loop only
             chunk_start = addr
@@ -209,6 +211,7 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
             chunk_start = addr
             chunkdata = data.to_bytes(datawidth)
         last_addr = addr
+    chunklist.append([chunk_start, chunkdata])
     return chunklist
 
 
