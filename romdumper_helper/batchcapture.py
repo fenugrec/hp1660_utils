@@ -48,17 +48,18 @@ def set_darkmode (instr):
         instr.write(f":setc {cn},0,0,0")
 
 
-# extract data
-# TODO: capture_depth should be automatic via parse_raw() or chunklist
-def dumploop (instr, start_addr, cnt, capture_depth, datawidth=2, timeout=5000):
+# run capture loop, return list of chunks
+# may return more data than desired (does not truncate a full capture)
+def dumploop (instr, start_addr, cnt, datawidth=2, timeout=5000):
     ca = start_addr
+    end_addr = start_addr + cnt - 1
     chunks = []
     while cnt > 0:
-        cap = min(cnt, capture_depth)
         instr.write(f":mach1:str:term b,'ADDR','#H{ca:x}'")
         instr.write('*cls')
         instr.write(':start')
-        print(f"CAPTURE : waiting for trigger on addr={ca:#x}; reset target now")
+        print(f"CAPTURE ({start_addr:#X}-{end_addr:#X}): "
+              "waiting for trigger on addr={ca:#x}; reset target now")
         # TODO : implement timeout + aborting
         while 1:
             esr = int(instr.query('mesr1?'))
@@ -67,9 +68,11 @@ def dumploop (instr, start_addr, cnt, capture_depth, datawidth=2, timeout=5000):
             # instr.write(':stop')
             time.sleep(0.2)
         rd=get_rawdata(instr)
-        chunks.extend(parse_raw(rd,am,dm))
-        cnt -= cap
-        ca += capture_depth
+        chunk=parse_raw(rd,am,dm)
+        chunks.append(chunk)
+        cl = len(chunk[1])
+        ca += cl
+        cnt -= cl
     return chunks
 
 # pretty-print a chunklist
@@ -135,7 +138,7 @@ def unshift_rawdata(src, mask):
 
 
 
-# parse raw data according to dev config, return chunklist
+# parse raw data according to dev config, return single contiguous chunk.
 # maybe some work needed to make it less device-dependant
 # rd: raw data received from :SYST:DATA? query, starting at its "DATA      " header
 # _mask: (num_pods * 2)-bytes long mask of bits to extract data, e.g.
@@ -158,7 +161,6 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
 
     #print(f"am: {addr_mask:X}, dm:{data_mask:X}")
     chunk_start = None
-    chunklist=[]
     chunkdata = b''
     last_addr = None
     for rawsample in itertools.batched(acqdata, bpr, strict=1):
@@ -177,11 +179,11 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
         else:
             print(f"discontinuity from {last_addr:#x} to {addr:#x}")
             # cannot ignore this without user intervention; save data and abort
-            chunklist.append([chunk_start, chunkdata])
+            chunklist=[chunk_start, chunkdata]
             return chunklist
         last_addr = addr
     print(f"last addr: {last_addr:#x}, chunksize={len(chunkdata):X}")
-    chunklist.append([chunk_start, chunkdata])
+    chunklist=[chunk_start, chunkdata]
     return chunklist
 
 
