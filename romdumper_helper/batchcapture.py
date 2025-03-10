@@ -67,10 +67,17 @@ def dumploop (instr, start_addr, cnt, capture_depth, datawidth=2, timeout=5000):
             # instr.write(':stop')
             time.sleep(0.2)
         rd=get_rawdata(instr)
-        chunks.append(parse_raw(rd,am,dm))
+        chunks.extend(parse_raw(rd,am,dm))
         cnt -= cap
         ca += capture_depth
     return chunks
+
+# pretty-print a chunklist
+def chunk_info (chl):
+    for c in chl:
+        start=c[0]
+        end=start + len(c[1]) - 1
+        print(f"{start:x}-{end:x}")
 
 def write_chunks (fname, chunks):
     with open(fname, "wb") as f:
@@ -162,7 +169,7 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
             #first loop only
             chunk_start = addr
             last_addr = addr - datawidth
-        if not (addr & 0xff):
+        if not (addr & 0xfff):
             print(f"@ {addr:X}: {data:X}... ") #chunksize={len(chunkdata):X}")
             #print(f"@ {addr:X}: {data:X} ({sample:X})")
         if addr == (last_addr + datawidth):
