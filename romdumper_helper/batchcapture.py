@@ -8,6 +8,7 @@ import sys
 import argparse
 import pyvisa
 import struct
+import itertools
 
 parser = argparse.ArgumentParser(description="HP 1660 LA-powered ROM dumper helper")
 parser.add_argument('-H', '--host', required=True, help='LA hostname')
@@ -47,6 +48,7 @@ def set_darkmode (instr):
         instr.write(f":setc {cn},0,0,0")
 
 # stupid loop reading a chunk of data one line at a time...
+# slow !!!
 #
 # with proper triggering, HP line # would be 0...<2^n-1> e.g. 0-4095 or 0-8191 ;
 # n is # of lines to expect = 2^n
@@ -135,9 +137,33 @@ def get_masks(instr):
     return ( amask, dmask )
 
 
+# magic func to iterate over set bits. sauce:
+# https://stackoverflow.com/a/8898977
+def bits(n):
+    while n:
+        b = n & (~n+1)
+        yield b
+        n ^= b
+
+# take a 'row' of data, e.g. 18 bytes on the hp1660, apply mask
+# and right-align the bits.
+def unshift_rawdata(src, mask):
+    out = 0
+    ob = 0
+    while mask:
+        if mask & 1:
+            if src & 1:
+                out |= 1 << ob
+            ob += 1
+        mask >>= 1
+        src >>= 1
+    return out
+
+
+
 
 # parse raw data according to dev config
-# maybe some work needed to make it versatile
+# maybe some work needed to make it less device-dependant
 # rd: raw data received from :SYST:DATA? query, starting at its "DATA      " header
 # _mask: (num_pods * 2)-bytes long mask of bits to extract data, e.g.
 #           A8 A7 ..... A1
@@ -156,6 +182,16 @@ def parse_raw(rd, addr_mask, data_mask):
     max_rows = max(struct.unpack('>10xHHHHHHHH', validrows))   #magic to extract 8x uint16
     acqdata = rd[176:]
     print(f"parsing {bpr}B/row, {max_rows} rows")
+
+    #convert to big integers
+    #addr_mask = int.from_bytes(addr_mask)
+    #data_mask = int.from_bytes(data_mask)
+    print(f"am: {addr_mask:X}, dm:{data_mask:X}")
+    for chunk in itertools.batched(acqdata, bpr):
+        sample=int.from_bytes(chunk)
+        addr=unshift_rawdata(sample, addr_mask)
+        data=unshift_rawdata(sample, data_mask)
+        print(f"@ {addr:X}: {data:X} ({sample:X})")
 
 
 # attempt to get raw data
