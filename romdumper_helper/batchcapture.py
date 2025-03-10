@@ -186,20 +186,19 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
     #print(f"am: {addr_mask:X}, dm:{data_mask:X}")
     chunk_start = None
     chunklist=[]
-    chunkdata = None
+    chunkdata = b''
     last_addr = None
     for rawsample in itertools.batched(acqdata, bpr, strict=1):
         sample=int.from_bytes(rawsample)
         addr=unshift_rawdata(sample, addr_mask)
         data=unshift_rawdata(sample, data_mask)
-        if not (addr & 0xff):
-            print(f"@ {addr:X}: {data:X}...")
-            #print(f"@ {addr:X}: {data:X} ({sample:X})")
         if chunk_start is None:
             #first loop only
             chunk_start = addr
-            chunkdata = data.to_bytes(datawidth)
             last_addr = addr - datawidth
+        if not (addr & 0xff):
+            print(f"@ {addr:X}: {data:X}... ") #chunksize={len(chunkdata):X}")
+            #print(f"@ {addr:X}: {data:X} ({sample:X})")
         if addr == (last_addr + datawidth):
             chunkdata = chunkdata + data.to_bytes(datawidth)
         else:
@@ -208,6 +207,7 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
             chunklist.append([chunk_start, chunkdata])
             return chunklist
         last_addr = addr
+    print(f"last addr: {last_addr:#x}, chunksize={len(chunkdata):X}")
     chunklist.append([chunk_start, chunkdata])
     return chunklist
 
