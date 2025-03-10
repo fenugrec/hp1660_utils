@@ -7,6 +7,7 @@
 import sys
 import argparse
 import pyvisa
+import struct
 
 parser = argparse.ArgumentParser(description="HP 1660 LA-powered ROM dumper helper")
 parser.add_argument('-H', '--host', required=True, help='LA hostname')
@@ -111,15 +112,50 @@ def write_chunks (fname, chunks):
         for chunk in chunks:
             f.write(chunk[1])
 
-# maybe parse raw data according to dev config
-def parse_raw(instr, rd):
-# instr.query(':mach1:sfor:label? "ADDR"')
+# WIP, unsatisfactory - 
+# get (address,data) bitmap masks
+#
+# In half-channel (full depth) mode, I don't think there's a way to
+# identify which pod in a pair is being used. That is, the 'sfor:label?' query will 
+# return a bit mask of whatever pods were enabled, but the GUI lets you change that
+# (e.g. A8 instead of A7) and I don't know any query that reflects this.
+def get_masks(instr):
+    am=instr.query(':mach1:sfor:label? "ADDR"').split(',')[3:]
+    dm=instr.query(':mach1:sfor:label? "DATA"').split(',')[3:]
 # returns something like '"ADDR  ",POSITIVE,0,0,3840,65535'
 # where the numeric fields are <clock_bits>,<bitmask>,<bitmask>...
 # and each bitmask applies to a pod ; matches left-to-right ordering of Format display
+# label string 'ADDR' is case-sensitive !
+    am_ints = list(map(int,am))
+    dm_ints = list(map(int,dm))
+    # pack values as big endian; a bit of magic to call struct.pack('>HHH...'
+    # with the correct number of H's
+    amask = struct.pack(f'>{len(am_ints)}H', *am_ints)
+    dmask = struct.pack(f'>{len(dm_ints)}H', *dm_ints)
+    return ( amask, dmask )
 
-# am=instr.query(':mach1:sfor:label? "ADDR"').split(',')[3:]
-# amask = list(map(int,am))
+
+
+# parse raw data according to dev config
+# maybe some work needed to make it versatile
+# rd: raw data received from :SYST:DATA? query, starting at its "DATA      " header
+# _mask: (num_pods * 2)-bytes long mask of bits to extract data, e.g.
+#           A8 A7 ..... A1
+# data_mask=FF 00 00 00 00  : 16 bits of A8 will end up in DATA
+def parse_raw(rd, addr_mask, data_mask):
+    sec_hdr = rd[0:10]
+    if sec_hdr != b'DATA      ':
+        print("bad section header")
+        return
+    sec_len = int.from_bytes(rd[12:16])
+    #not going to parse the entire Preamble struc here
+    podpairs = rd[19] # this should allow to do model-specific parsing
+    bpr = 2 + podpairs*4    # 2 bytes for clock + 4 bytes per podpair
+    podlist = rd[22:24] #bitmask of pods 'assigned to analyzer 1'
+    validrows = rd[100:126]
+    max_rows = max(struct.unpack('>10xHHHHHHHH', validrows))   #magic to extract 8x uint16
+    acqdata = rd[176:]
+    print(f"parsing {bpr}B/row, {max_rows} rows")
 
 
 # attempt to get raw data
