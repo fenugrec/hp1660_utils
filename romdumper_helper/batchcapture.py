@@ -168,7 +168,7 @@ def unshift_rawdata(src, mask):
 # _mask: (num_pods * 2)-bytes long mask of bits to extract data, e.g.
 #           A8 A7 ..... A1
 # data_mask=FF 00 00 00 00  : 16 bits of A8 will end up in DATA
-def parse_raw(rd, addr_mask, data_mask):
+def parse_raw(rd, addr_mask, data_mask, datawidth=2):
     sec_hdr = rd[0:10]
     if sec_hdr != b'DATA      ':
         print("bad section header")
@@ -186,12 +186,30 @@ def parse_raw(rd, addr_mask, data_mask):
     #convert to big integers
     #addr_mask = int.from_bytes(addr_mask)
     #data_mask = int.from_bytes(data_mask)
-    print(f"am: {addr_mask:X}, dm:{data_mask:X}")
-    for chunk in itertools.batched(acqdata, bpr):
-        sample=int.from_bytes(chunk)
+    #print(f"am: {addr_mask:X}, dm:{data_mask:X}")
+    chunk_start = None
+    chunklist=[]
+    chunkdata = None
+    last_addr = None
+    for rawsample in itertools.batched(acqdata, bpr):
+        sample=int.from_bytes(rawsample)
         addr=unshift_rawdata(sample, addr_mask)
         data=unshift_rawdata(sample, data_mask)
         print(f"@ {addr:X}: {data:X} ({sample:X})")
+        if chunk_start is None:
+            #first loop only
+            chunk_start = addr
+            chunkdata = data.to_bytes(datawidth)
+            last_addr = addr - datawidth
+        if addr == (last_addr + datawidth):
+            chunkdata = chunkdata + data.to_bytes(datawidth)
+        else:
+            print(f"discontinuity from {last_addr:#x} to {addr:#x}")
+            chunklist.append([chunk_start, chunkdata])
+            chunk_start = addr
+            chunkdata = data.to_bytes(datawidth)
+        last_addr = addr
+    return chunklist
 
 
 # attempt to get raw data
