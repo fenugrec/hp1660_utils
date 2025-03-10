@@ -114,27 +114,30 @@ def write_chunks (fname, chunks):
         for chunk in chunks:
             f.write(chunk[1])
 
-# WIP, unsatisfactory - 
+
 # get (address,data) bitmap masks
-#
+# hack : set mode to FULL before getting mask, then restore DEEP (half-chanel) mode if required
 # In half-channel (full depth) mode, I don't think there's a way to
 # identify which pod in a pair is being used. That is, the 'sfor:label?' query will 
 # return a bit mask of whatever pods were enabled, but the GUI lets you change that
-# (e.g. A8 instead of A7) and I don't know any query that reflects this.
-def get_masks(instr):
-    am=instr.query(':mach1:sfor:label? "ADDR"').split(',')[3:]
-    dm=instr.query(':mach1:sfor:label? "DATA"').split(',')[3:]
+# (e.g. A8 instead of A7) hence this workaround.
+def get_mask2(instr):
+    origmode=instr.query(':mach1:sfor:mode?')
+    instr.write(':mach1:sfor:mode FULL')
+    am_str=instr.query(':mach1:sfor:label? "ADDR"').split(',')[3:]
+    dm_str=instr.query(':mach1:sfor:label? "DATA"').split(',')[3:]
+    am = list(map(int,am_str))
+    dm = list(map(int,dm_str))
+    instr.write(':mach1:sfor:mode ' + origmode)
 # returns something like '"ADDR  ",POSITIVE,0,0,3840,65535'
 # where the numeric fields are <clock_bits>,<bitmask>,<bitmask>...
 # and each bitmask applies to a pod ; matches left-to-right ordering of Format display
 # label string 'ADDR' is case-sensitive !
-    am_ints = list(map(int,am))
-    dm_ints = list(map(int,dm))
-    # pack values as big endian; a bit of magic to call struct.pack('>HHH...'
-    # with the correct number of H's
-    amask = struct.pack(f'>{len(am_ints)}H', *am_ints)
-    dmask = struct.pack(f'>{len(dm_ints)}H', *dm_ints)
-    return ( amask, dmask )
+    podlist=instr.query_ascii_values(':mach1:ass?', 'd')
+    #e.g. [8,7,4,3,2,1]. Use these to shift the bitmasks to final 'A8A7A6....A1' pattern
+    amask = sum(map(lambda msk, pl: msk << (16 * (pl - 1)), am, podlist))
+    dmask = sum(map(lambda msk, pl: msk << (16 * (pl - 1)), dm, podlist))
+    return (amask,dmask)
 
 
 # magic func to iterate over set bits. sauce:
