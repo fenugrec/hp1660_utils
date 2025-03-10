@@ -180,18 +180,15 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
     podlist = rd[22:24] #bitmask of pods 'assigned to analyzer 1'
     validrows = rd[100:126]
     max_rows = max(struct.unpack('>10xHHHHHHHH', validrows))   #magic to extract 8x uint16
-    acqdata = rd[176:]
+    acqdata = rd[176:176+(max_rows * bpr)]
     print(f"parsing {bpr}B/row, {max_rows} rows")
 
-    #convert to big integers
-    #addr_mask = int.from_bytes(addr_mask)
-    #data_mask = int.from_bytes(data_mask)
     #print(f"am: {addr_mask:X}, dm:{data_mask:X}")
     chunk_start = None
     chunklist=[]
     chunkdata = None
     last_addr = None
-    for rawsample in itertools.batched(acqdata, bpr):
+    for rawsample in itertools.batched(acqdata, bpr, strict=1):
         sample=int.from_bytes(rawsample)
         addr=unshift_rawdata(sample, addr_mask)
         data=unshift_rawdata(sample, data_mask)
@@ -207,15 +204,15 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
             chunkdata = chunkdata + data.to_bytes(datawidth)
         else:
             print(f"discontinuity from {last_addr:#x} to {addr:#x}")
+            # cannot ignore this without user intervention; save data and abort
             chunklist.append([chunk_start, chunkdata])
-            chunk_start = addr
-            chunkdata = data.to_bytes(datawidth)
+            return chunklist
         last_addr = addr
     chunklist.append([chunk_start, chunkdata])
     return chunklist
 
 
-# attempt to get raw data
+# fetch raw data after a capture
 def get_rawdata(instr):
     # for some reason pyvisa query* functions choke on blockdata. this doesn't help
 #    ot=instr.read_termination()
