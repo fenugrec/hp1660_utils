@@ -54,22 +54,30 @@ def dumploop (instr, start_addr, cnt, datawidth=2, timeout=5000):
     ca = start_addr
     end_addr = start_addr + cnt - 1
     chunks = []
+    am,dm = get_mask(instr)
     while cnt > 0:
         instr.write(f":mach1:str:term b,'ADDR','#H{ca:x}'")
         instr.write('*cls')
         instr.write(':start')
         print(f"CAPTURE ({start_addr:#X}-{end_addr:#X}): "
-              "waiting for trigger on addr={ca:#x}; reset target now")
-        # TODO : implement timeout + aborting
+              f"waiting for trigger on addr={ca:#X}; reset target now")
+        req_abort = 0
         while 1:
-            esr = int(instr.query('mesr1?'))
-            # bit 0 should be set when done
-            if esr & 1: break
-            # instr.write(':stop')
-            time.sleep(0.2)
+            try:
+                esr = int(instr.query('mesr1?'))
+                # bit 0 should be set when done
+                if esr & 1: break
+                # instr.write(':stop')
+                time.sleep(0.2)
+            except KeyboardInterrupt:
+                req_abort = 1
+                break
         rd=get_rawdata(instr)
         chunk=parse_raw(rd,am,dm)
         chunks.append(chunk)
+        if req_abort:
+            print("cancelling operation, data may be incomplete")
+            return chunks
         cl = len(chunk[1])
         ca += cl
         cnt -= cl
@@ -94,7 +102,7 @@ def write_chunks (fname, chunks):
 # identify which pod in a pair is being used. That is, the 'sfor:label?' query will 
 # return a bit mask of whatever pods were enabled, but the GUI lets you change that
 # (e.g. A8 instead of A7) hence this workaround.
-def get_mask2(instr):
+def get_mask(instr):
     origmode=instr.query(':mach1:sfor:mode?')
     instr.write(':mach1:sfor:mode FULL')
     am_str=instr.query(':mach1:sfor:label? "ADDR"').split(',')[3:]
