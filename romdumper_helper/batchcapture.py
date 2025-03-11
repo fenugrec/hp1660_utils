@@ -197,23 +197,7 @@ def parse_raw(rd, addr_mask, data_mask, datawidth=2):
 
 # fetch raw data after a capture
 def get_rawdata(instr):
-    # for some reason pyvisa query* functions choke on blockdata. this doesn't help
-#    ot=instr.read_termination()
-#    instr.read_termination = ''
-#    instr.read_termination = ot
-    instr.write(':syst:data?')
-    marker = instr.read_bytes(1)
-    if marker != b'#':
-        print(f"no # marker, got {marker}")
-        return
-    ndig = int(instr.read_bytes(1))
-    datalen = int(instr.read_bytes(ndig))
-#    print('expecting {datalen:#x} bytes')
-    rawdata = instr.read_bytes(datalen)
-    #purge trailing '\n'
-    crumb = instr.read_bytes(1)
-    if crumb != b'\n':
-        print(f"didnt get expected trailing LF, got {crumb}")
+    rawdata = instr.query_binary_values(':syst:data?', datatype='s', container=bytes)
     return rawdata
 
 
