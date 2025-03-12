@@ -30,8 +30,9 @@ tn = telnetlib.Telnet(hostname, port)
 
 params = {}
 
-params['filename'] = input("Logic Analyzer Filename = ").rstrip()
-params['description'] = input("Logic Analyzer File Description\n(must be 32 characters or less) = ").rstrip()
+# file will be written to root of storage device; must send explicit 'CD' commands to change dir before
+params['filename'] = input("Filename on target LA (truncated to 10 chars):").rstrip()[0:10]
+params['description'] = input("Logic Analyzer File Description\n(truncated to 32 chars):").rstrip()[0:32]
 params['option'] = input(""""Invasm" Field Options:
  A = No "Invasm" Field
  B = "Invasm" Field with no pop-up
@@ -39,18 +40,16 @@ params['option'] = input(""""Invasm" Field Options:
  D = "Invasm" Field with pop-up. 8 choices in pop-up.
 Select the appropriate letter (A, B, C or D)""").rstrip()
 
-if len(params['description']) > 32:
-    print("Description too long will be trimmed")
 
 # get the params. 
 if params['option'].upper() == 'A':
-    type_byte = '\xFF'
+    type_byte = b'\xFF'
 elif params['option'].upper() == 'B':
-    type_byte = '\x00'
+    type_byte = b'\x00'
 elif params['option'].upper() == 'C':
-    type_byte = '\x01'
+    type_byte = b'\x01'
 elif params['option'].upper() == 'D':
-    type_byte = '\x02'
+    type_byte = b'\x02'
 else:
     raise Exception("Unknown type optiom specified (A,B,C or D)")
 
@@ -59,7 +58,7 @@ tn.write(""":MMEMory:DOWNload '{filename}',INTERNAL0,'{description}',-15614,""".
 data_size = len(buffer)+1
 
 tn.write("#8%08i".encode('ascii') % data_size)
-tn.write(type_byte.encode('ascii'))
+tn.write(type_byte)
 tn.write(buffer)
-tn.write('\n'.encode('ascii'))
+tn.write(b'\n')
 tn.close()
