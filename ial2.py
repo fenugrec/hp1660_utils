@@ -68,14 +68,8 @@ elif params['option'] == 'C':
 elif params['option'] == 'D':
     type_byte = b'\x02'
 else:
-    raise Exception("Unknown type optiom specified (A,B,C or D)")
+    raise Exception("Unknown type option specified (A,B,C or D)")
 
-# now actually do the transfer. 
-tn.write(""":MMEMory:DOWNload '{filename}',INTERNAL0,'{description}',-15614,""".format(**params).encode('ascii'))
-data_size = len(buffer)+1
-
-tn.write("#8%08i".encode('ascii') % data_size)
-tn.write(type_byte)
-tn.write(buffer)
-tn.write(b'\n')
-tn.close()
+la.write_binary_values(f""":MMEMory:DOWNload '{filename}',INTERNAL0,'{description}',-15614,""",
+                       type_byte + buffer, datatype='s')
+la.close()
