@@ -131,6 +131,7 @@ def bits(n):
 
 # take a 'row' of data, e.g. 18 bytes on the hp1660, apply mask
 # and right-align the bits.
+#
 def unshift_rawdata(src, mask):
     out = 0
     ob = 0
@@ -143,6 +144,14 @@ def unshift_rawdata(src, mask):
         src >>= 1
     return out
 
+# alternate version of unshift_rawdata, seems to perform better, but a lot less obvious.
+# courtesy of 'TeXNickAL' on irc #python.
+def unshift_rawdata2(src, mask):
+# compute a tuple? of all the weights of the '1' bits of the mask
+    wide_wt_it = ( 2**ss   for ss, c in enumerate( f'{mask:b}'[::-1] )  if c == '1' ) 
+    # and add all weights where the corresponding bit is set in 'src'
+    return  sum(  2**ss   for ss, wide_wt in enumerate(wide_wt_it)   if src&wide_wt )
+  
 
 
 
