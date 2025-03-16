@@ -71,10 +71,11 @@ import argparse
 import pyvisa
 import struct
 import itertools
+import time
 
 
 # modify this func if automated reset is possible
-def target_reset(instr):
+def target_reset():
     print("reset target now.")
     return
 
@@ -109,12 +110,13 @@ def dumploop (instr, start_addr, cnt, datawidth=2, timeout=5000):
     ca = start_addr
     end_addr = start_addr + cnt - 1
     chunks = []
+    instr.write(':sel 1')
     am,dm = get_mask(instr)
     while cnt > 0:
         instr.write(f":mach1:str:term b,'ADDR','#H{ca:x}'")
         instr.write('*cls')
         instr.write(':start')
-        target_reset(instr)
+        target_reset()
         print(f"CAPTURE ({start_addr:#X}-{end_addr:#X}): "
               f"waiting for trigger on addr={ca:#X}")
         req_abort = 0
