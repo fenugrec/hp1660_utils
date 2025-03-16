@@ -4,6 +4,17 @@
 #need pyvisa and pyvisa-py (or other backend)
 #
 # could work over GPIB and RS232 transports as well, hopefully
+#
+# This is never usable as-is and is meant to be tailored to each setup.
+#
+# Most important function would be dumploop() which may need modifications,
+# such as triggering an external target reset via target_reset()
+#
+# Then one would run 'python -i batchcapture.py' where the -i arg starts an
+# interpreter after running this script, which provides :
+# - an active connection to the instrument, via handle 'la'
+# - some functions like set_darkmode(la)
+# - easier to iterate over settings and examine data
 
 import argparse
 import pyvisa
@@ -11,6 +22,10 @@ import struct
 import itertools
 
 
+# modify this func if automated reset is possible
+def target_reset(instr):
+    print("reset target now.")
+    return
 
 # retrieve current color settings. color 'number' is from 1 to 7
 def get_colors (instr):
@@ -48,8 +63,9 @@ def dumploop (instr, start_addr, cnt, datawidth=2, timeout=5000):
         instr.write(f":mach1:str:term b,'ADDR','#H{ca:x}'")
         instr.write('*cls')
         instr.write(':start')
+        target_reset(instr)
         print(f"CAPTURE ({start_addr:#X}-{end_addr:#X}): "
-              f"waiting for trigger on addr={ca:#X}; reset target now")
+              f"waiting for trigger on addr={ca:#X}")
         req_abort = 0
         while 1:
             try:
@@ -109,14 +125,6 @@ def get_mask(instr):
     dmask = sum(map(lambda msk, pl: msk << (16 * (pl - 1)), dm, podlist))
     return (amask,dmask)
 
-
-# magic func to iterate over set bits. sauce:
-# https://stackoverflow.com/a/8898977
-def bits(n):
-    while n:
-        b = n & (~n+1)
-        yield b
-        n ^= b
 
 # take a 'row' of data, e.g. 18 bytes on the hp1660, apply mask
 # and right-align the bits.
@@ -199,21 +207,18 @@ def get_rawdata(instr):
     return rawdata
 
 
-def main():
-    parser = argparse.ArgumentParser(description="HP 1660 LA-powered ROM dumper helper")
-    parser.add_argument('-H', '--host', required=True, help='LA hostname')
-    parser.add_argument('-p', '--port', type=int, default=5025, help='telnet port')
-    args = parser.parse_args()
+parser = argparse.ArgumentParser(description="HP 1660 LA-powered ROM dumper helper")
+parser.add_argument('-H', '--host', required=True, help='LA hostname')
+parser.add_argument('-p', '--port', type=int, default=5025, help='telnet port')
+args = parser.parse_args()
 
-    hostname=args.host
-    port=args.port
+hostname=args.host
+port=args.port
 
 
-    rm = pyvisa.ResourceManager('@py')
-    la=rm.open_resource('TCPIP0::' + hostname + '::' + str(port) + '::SOCKET')
-    # because the 1660 isn't "discoverable" we need to use ::SOCKET mode, which means we need to set terminator
-    la.read_termination='\n'
-    print("connected to: " + la.query('*idn?'))
+rm = pyvisa.ResourceManager('@py')
+la=rm.open_resource('TCPIP0::' + hostname + '::' + str(port) + '::SOCKET')
+# because the 1660 isn't "discoverable" we need to use ::SOCKET mode, which means we need to set terminator
+la.read_termination='\n'
+print("connected to: " + la.query('*idn?'))
 
-if __name__ == '__main__':
-    main()
