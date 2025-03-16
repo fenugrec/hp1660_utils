@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python
 #
 # fenugrec 2025
 #

@@ -1,29 +1,15 @@
-#! python
+#!/usr/bin/env python
+
 # (fenugrec 2025)
 #need pyvisa and pyvisa-py (or other backend)
 #
 # could work over GPIB and RS232 transports as well, hopefully
 
-import sys
 import argparse
 import pyvisa
 import struct
 import itertools
 
-parser = argparse.ArgumentParser(description="HP 1660 LA-powered ROM dumper helper")
-parser.add_argument('-H', '--host', required=True, help='LA hostname')
-parser.add_argument('-p', '--port', type=int, default=5025, help='telnet port')
-args = parser.parse_args(sys.argv[1:])
-
-hostname=args.host
-port=args.port
-
-
-rm = pyvisa.ResourceManager('@py')
-la=rm.open_resource('TCPIP0::' + hostname + '::' + str(port) + '::SOCKET')
-# because the 1660 isn't "discoverable" we need to use ::SOCKET mode, which means we need to set terminator
-la.read_termination='\n'
-print(la.query('*idn?'))
 
 
 # retrieve current color settings. color 'number' is from 1 to 7
@@ -47,6 +33,9 @@ def set_darkmode (instr):
     for cn in range(1,8):
         instr.write(f":setc {cn},0,0,0")
 
+# restore default colors
+def reset_colors (instr):
+    instr.write(":setc def")
 
 # run capture loop, return list of chunks
 # may return more data than desired (does not truncate a full capture)
@@ -210,3 +199,21 @@ def get_rawdata(instr):
     return rawdata
 
 
+def main():
+    parser = argparse.ArgumentParser(description="HP 1660 LA-powered ROM dumper helper")
+    parser.add_argument('-H', '--host', required=True, help='LA hostname')
+    parser.add_argument('-p', '--port', type=int, default=5025, help='telnet port')
+    args = parser.parse_args()
+
+    hostname=args.host
+    port=args.port
+
+
+    rm = pyvisa.ResourceManager('@py')
+    la=rm.open_resource('TCPIP0::' + hostname + '::' + str(port) + '::SOCKET')
+    # because the 1660 isn't "discoverable" we need to use ::SOCKET mode, which means we need to set terminator
+    la.read_termination='\n'
+    print("connected to: " + la.query('*idn?'))
+
+if __name__ == '__main__':
+    main()
