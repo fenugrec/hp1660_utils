@@ -1,20 +1,71 @@
 #!/usr/bin/env python
+#
+# (c) fenugrec 2025
+#
+# script to aid in dumping ROMs in-situ, while target is running.
+# Requires pyvisa and pyvisa-py (or other backend)
+#
+'''
+This was developed for the HP 1660C but should work on many similar LAs.
 
-# (fenugrec 2025)
-#need pyvisa and pyvisa-py (or other backend)
-#
-# could work over GPIB and RS232 transports as well, hopefully
-#
-# This is never usable as-is and is meant to be tailored to each setup.
-#
-# Most important function would be dumploop() which may need modifications,
-# such as triggering an external target reset via target_reset()
-#
-# Then one would run 'python -i batchcapture.py' where the -i arg starts an
-# interpreter after running this script, which provides :
-# - an active connection to the instrument, via handle 'la'
-# - some functions like set_darkmode(la)
-# - easier to iterate over settings and examine data
+The strategy is to load the correct config on the hp1660 manually, then use this script to automate
+	- setting up trigger
+	- retrieving data for a 'section'
+	- preparing next trigger
+	- reset target
+	- repeat
+
+In half-channel mode, the 1660C can do 8k records per trace, i.e. 16kB of ROM data.
+
+Should work over GPIB and RS232 transports as well, hopefully
+
+
+****************************************
+LA setup requirements:
+	- trigger definition must be functional, saving only the ROM fetch data, no opcodes
+	- trigger term B is the first address we want to dump
+	- trigger term C(or other) is the last opcode fetch before the ROM fetch; 82EBA in the example below
+	e.g.
+		082EBA  <some opcode fetch here, part of some kind of MOV op>
+		000000  <this is the data fetch @ address 0 that we need>
+		082EBC  <some later code part of a short loop>
+		082EBE
+		...
+		082EBA
+		000002  <reading next location for checksum>
+
+	term B will be set by the script and incremented on every capture
+	other terms will not be modified
+
+	The trigger setup must produce a listing that is exclusively the data fetches, e.g.
+	line	ADDR	DATA
+	0	0000	FFFF
+	1	0002	0000
+	2	0004	......
+
+****************************************
+This script is meant to be tailored to each setup.
+
+Most important functions would be dumploop() which may need modifications,
+and target_reset() for triggering an external target reset
+
+Then one would run 'python -i batchcapture.py -H 192.168.x.y' where the -i arg starts an
+interpreter after running this script, which provides :
+- an active pyvisa connection to the instrument, via handle 'la'
+- generic pyvisa queries like la.query("....")
+- misc functions like set_darkmode(la)
+the console makes it easier to iterate over settings and examine data
+
+
+
+****************************************
+misc useful commands
+
+:system:dsp 'generic GUI message'
+
+set sequence level 1 to count 65535 times before proceeding ? -> doesnt work as wanted
+	:mach1:str:find0 'anystate|nostate',65535
+'''
 
 import argparse
 import pyvisa
