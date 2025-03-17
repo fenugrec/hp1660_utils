@@ -110,7 +110,7 @@ def dumploop (instr, start_addr, cnt, datawidth=2, timeout=5000):
     ca = start_addr
     end_addr = start_addr + cnt - 1
     chunks = []
-    instr.write(':sel 1')
+    instr.write(f":sel 1")
     am,dm = get_mask(instr)
     while cnt > 0:
         instr.write(f":mach1:str:term b,'ADDR','#H{ca:x}'")
@@ -131,7 +131,7 @@ def dumploop (instr, start_addr, cnt, datawidth=2, timeout=5000):
                 req_abort = 1
                 break
         rd=get_rawdata(instr)
-        chunk=parse_raw(rd,am,dm)
+        chunk=parse_raw(rd,am,dm, datawidth)
         chunks.append(chunk)
         if req_abort:
             print("cancelling operation, data may be incomplete")
