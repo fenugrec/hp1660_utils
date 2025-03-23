@@ -133,6 +133,8 @@ def is_config(d: bytes):
     return d[0x24:0x24+6] == b'CONFIG'
 
 
+def is_s(d: bytes):
+    return d[0:5] == b'"IAL"'
 
 
 #######################################
@@ -160,7 +162,7 @@ def unchunk(d:bytes):
 def parse_reloc(d: bytes):
     if is_chunked(d):
         descr=d[0x6:0x26].decode()
-        print("chunked invasm, '{descr}'")
+        print(f"chunked invasm, '{descr}'")
         d=unchunk(d)[0x25:]
     # here, d[0:2] has magic 82 03
     objname = d[3:0x12].decode().rstrip() # made up a name for this. Seems to be uppercase'd .S filename
@@ -223,12 +225,16 @@ def identify (filedata: bytes):
         return parse_hfs(filedata)
     elif is_config(filedata):
         return parse_config(filedata)
+    elif is_s(filedata):
+        print(".S assembly")
+        return
     else:
         print("Unrecognized format !")
     return
 
 import sys
 def main():
+    print(f"Identifying: '{sys.argv[1]}'")
     with open(sys.argv[1], "rb") as f:
         d=f.read()
         identify(d)
