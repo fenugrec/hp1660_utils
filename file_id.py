@@ -4,22 +4,40 @@
 #
 # File identification magic
 #
-# .R files, inverse assembler, config, etc... what a mess, not to mention LIF filesystem .
+'''
+.R files, inverse assembler, config, etc... what a mess, not to mention LIF filesystem .
 
-# TODO : make some kind of class that has a 'print info' , 'identify' method ?
-#
+TODO : make some kind of class that has a 'print info' , 'identify' method ?
+TODO : invasm 'field' selection, something like
+class ia_field(dict):
+    def __missing__(self, key):
+        return f"(unknown IA field {key:#x})"
+ia_fields = ia_field({
+    0xff: "A: no 'Invasm' field",
+    0x00: "B: no popup",
+    0x01: "C: popup, 2 choices",
+    0x02: "D: popup, 8 choices"
+    })
+
+**********
+References
+**********
+https://github.com/RogerSanders/HFSLIFWriter/blob/main/Program.cs
+hp 64000 docs
+
+'''
 
 import collections
 import struct
 
-# Once on the filesystem (i.e. once it has an HFSLIF header), there is a 'file type' field that we can use
+# Once on the LA filesystem (i.e. once it has an HFSLIF header), there is a 'file type' field that we can use
 
 filetype=collections.namedtuple('filetype', 'id shortname description')
 
 '''
 This table was prepared from
-	- data and shortstrings from decompilation of HP 1660 firmware
-	- long string from HP 1660C/CS/CP-Series Logic Analyzers - Programmer's Guide (01660-97024)
+	- decompilation of HP 1660 firmware (data and shortstrings)
+	- HP 1660C/CS/CP-Series Logic Analyzers - Programmer's Guide 01660-97024 (a few descriptions)
 '''
 filetype_list = [
     filetype(-0x3fff, "1650/1_system", ''),
@@ -79,49 +97,70 @@ module_tbl = mod_dict({
 })
 
 '''
+****************************************
+File structure
+****************************************
 Config and invasm files will look like:
 
 struct chunk {
-    u16 chunk_length;   //usually 00 FE, so 254 bytes until the next chunk
+    u16 chunk_length;   //usually (always?) 00 FE, so 254 bytes until the next chunk
     u8 chunk_data[chunk_length];
     }
 Usually (always?) the last chunk will be padded to the next 256 byte boundary.
-I think for the section data (described below) to make sense, it must be 'un-chunked'.
+I think for the section data (described below) to make sense, entire file must be 'un-chunked'.
 
 
 starting after the typical '00 FE', we have:
 {
     u32 config_file_len;    //not 100% sure exactly what that includes
-    char[32] description?;
+    char[32] description;
 }
 
 ##############
 # config file
 ##############
-In a config file, the char[32] field isfollowed by multiple 'sections'
+Example:
+00000000: 00 fe 00 00 1f 49 36 38 30 30 30 20 31 30 33 31  .....I68000 1031
+00000010: 31 47 20 49 6e 74 65 72 66 61 63 65 20 31 36 35  1G Interface 165
+00000020: 31 31 20 35 2e 30 43 4f 4e 46 49 47 20 20 20 20  11 5.0CONFIG    
+00000030: 00 1e 00 00 0e 7a 4d 41 43 48 49 4e 45 20 31 20  .....zMACHINE 1 
+.....
+
+In a config file, the char[32] field is followed by multiple 'sections'
 (this is documented somewhat in the various Programmer Guide docs)
 
 struct section {
-    char[11] config;    //e.g. "CONFIG    " with trailing 0
-    u8 module_id;
-    u32 section_len;
-    u8 section_data[section_len?];
+    char[11] sec_name;    //e.g. "CONFIG    " with trailing 0
+    u8 module_id;       //e.g. 0x1E for hp1660
+    u32 section_len;    // 0x0E7A in above example
+    u8 section_data[section_len];
 }
 
 ##############
 # invasm file
 ##############
+Example:
+00000000: 00 fe 00 00 2d 59 36 38 30 30 30 20 31 30 33 31  ....-Y68000 1031
+00000010: 31 47 20 49 6e 74 65 72 66 61 63 65 20 49 41 20  1G Interface IA 
+00000020: 20 20 20 35 20 30 00 82 03 40 56 31 47 49 30 20     5 0...@V1GI0 
+00000030: 20 20 20 20 20 20 20 20 20 00 5b 00 01 0f 2f 65           .[.../e
+
 After the char[32] field, we have one single 0x00 byte, followed by the magic 82 03.
-'''
+I think starting from that 82 03, once unchunked, it should match contents of the .R file ?
+
+
 
 #######################################
 #   identify specific types
 #######################################
-# These functions are passed data without HFS/LIF header
-# Semantics are all weird: 
-# - HFSLIF is a type of container, usually contains an invasm ?
-# - 'is_chunked' only refers to 256-byte splits (file itself could be Config or invasm)
-# - is_config / is_reloc are actually file 'types'
+These functions are passed data with HFS/LIF header stripped
+Semantics are all weird: 
+- HFSLIF is a type of container, usually contains an invasm ?
+- 'is_chunked' only refers to 256-byte splits (file itself could be Config or invasm)
+- is_config / is_reloc are actually file 'types'
+'''
+
+
 
 # a bit muddy; it seems like both invasm and config files can start with 00 FE
 # which is simply a chunk size marker. So this just indicates if
@@ -151,7 +190,7 @@ def is_s(d: bytes):
 #   parse and collect info
 #######################################
 
-# reconstruct file with the '00 FE <254 bytes of stuff>' chunking format. Discards trailing data
+# reconstruct file with '00 FE <254 bytes of stuff>' chunking format. Discards trailing data
 def unchunk(d:bytes):
     cleaned=b''
     while len(d) > 0:
