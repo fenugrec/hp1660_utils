@@ -235,6 +235,9 @@ def parse_config(d: bytes):
         module=module_tbl[mod_id]
         print(f"section '{sec_name}', model {module}, section len {sec_len:#x}")
         if (sec_len == 0): break
+        if 'INVASM' in sec_name:
+            ia_name = d2[i+16:i+16+sec_len-1].decode().rstrip()
+            print(f"Associated IA: '{ia_name}'")
         i += sec_len + 16 # skip our header and section
     return
 
