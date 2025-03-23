@@ -1,4 +1,15 @@
-tools for HP 1660Cx firmware images
+tools for working with HP logic analysers such as 1660Cx
 
-initial info from
+- extract firmware images
+- some ghidra tools for firmware RE
+- transfer inverse assemblers
+- working with inverse assembler files
+- automate LA control for passive ROM dumping
+
+Related links:
 https://www.eevblog.com/forum/repair/hp-1663a-logic-analyzer-not-starting-up-after-flash-rom-update/msg3721081/#msg3721081
+https://github.com/RogerSanders/HFSLIFWriter/blob/main/Program.cs
+https://github.com/tribula-mel/hp54520_tools
+https://www.eevblog.com/forum/testgear/hp-logic-analyzer-inverse-assemblers/
+
+
