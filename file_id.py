@@ -143,14 +143,16 @@ def unchunk(d:bytes):
     cleaned=b''
     while len(d) > 0:
         n = struct.unpack('>H',d[0:2])[0] 
-        if n == 0x1ff or n == 0x7ff:
+#        if n == 0x1ff or n == 0x7ff:
             #let's assume that's how a last-chunk is signaled, always...
-            return cleaned
+#            return cleaned
         if n > len(d):
             print(f"problem unchunking after {len(cleaned):#x}: chunk_len wants {n:#x}")
             return
         cleaned += d[2:n+2]
         d=d[n+2:]
+        if n != 0xfe:
+            break
     return cleaned
 
 # data either starts with 82 03 magic, or is chunked and has a description field before the 8203
@@ -169,18 +171,18 @@ def parse_reloc(d: bytes):
 # expects data to start with '00 FE' chunk size marker
 def parse_config(d: bytes):
     d2 = unchunk(d)
-    config_len = struct.unpack('>I', d2[2:6])[0]
-    descr = d2[6:0x26]
-    i = 0x26
+    config_len = struct.unpack('>I', d2[0:4])[0]
+    descr = d2[4:0x24].decode().rstrip()
+    print(f"config: '{descr}'")
+    i = 0x24
     while (i + 17) < len(d2):
-        sec_name=d2[i,i+10].decode().rstrip()
-        mod_id=int.from_bytes(d2[i+12])
-        sec_len=struct.unpack('>I', d2[i+13,i+17])[0]
-        module=module_tbl[mod_id]
-        if not module:
-            module=f"unknown: {mod_id}"
-        print(f"section '{sec_name}', model {module}, section len={sec_len:#x}")
-        i += sec_len
+        sec_name=d2[i:i+10].decode().rstrip()
+        mod_id=d2[i+11]
+        sec_len=struct.unpack('>I', d2[i+12:i+16])[0]
+        module=module_tbl.get(mod_id, f"unknown: {mod_id}")
+        print(f"section '{sec_name}', model {module}, section len {sec_len:#x}")
+        if (sec_len == 0): break
+        i += sec_len + 16 # skip our header and section
     return
 
 
@@ -200,11 +202,7 @@ def parse_hfs(d: bytes):
     if (len(d) != expect_len):
         print(f"unexpected file size {len(d):#X} vs {expect_len:#X}")
         return
-    ftype = filetype_tbl[file_id]
-    if ftype:
-        shortname = ftype.shortname
-    else:
-        shortname = f"unknown: {file_id}"
+    shortname = filetype_tbl.get(file_id, f"unknown: {file_id}")
     print(f"type {file_id:#x}:{shortname}")
     # now, whatever it contains, must be also identified
     identify(d[0x200:])
