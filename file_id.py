@@ -225,3 +225,12 @@ def identify (filedata: bytes):
     else:
         print("Unrecognized format !")
     return
+
+import sys
+def main():
+    with open(sys.argv[1], "rb") as f:
+        d=f.read()
+        identify(d)
+
+if __name__ == '__main__':
+        main()
