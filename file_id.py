@@ -57,16 +57,26 @@ filetype_list = [
     filetype(-2, "LIF_BINARY  ", ''),
     filetype(1, "LIF_ASCII   ", ''),
 ]
-filetype_tbl = {x.id:x for x in filetype_list}
 
-# module ID
-module_tbl = {
+# some magic to implement a default filetype
+class ftd(dict):
+    def __missing__(self, key):
+        return filetype(0, "-------", f"(unknown ID {key})")
+
+filetype_tbl = ftd({x.id:x for x in filetype_list})
+
+#and more magic for unknown module IDs
+class mod_dict(dict):
+    def __missing__(self, key):
+        return f"(unknown mod ID {key})"
+
+module_tbl = mod_dict({
     30: 'HP16511', #not 100% sure
     31: 'HP1650B/51B',
     32: 'HP1660C/CS/CP,HP16550A',
     34: 'HP1670D/G',
     40: 'HP16540',
-}
+})
 
 '''
 Config and invasm files will look like:
@@ -166,8 +176,9 @@ def parse_reloc(d: bytes):
         d=unchunk(d)[0x25:]
     # here, d[0:2] has magic 82 03
     objname = d[3:0x12].decode().rstrip() # made up a name for this. Seems to be uppercase'd .S filename
-    ia_marker = d[0x3d:0x4c].decode() # 'IAILXXXXXASSEMB'
-    print(f"objname: {objname}, marker {ia_marker}")
+    # oops, there's some variable-length fields here before the following. TODO
+    # ia_marker = d[0x45:0x45+0x10].decode() # 'IAILXXXXXASSEMB'
+    print(f"objname: {objname}")
     return
 
 
@@ -182,7 +193,7 @@ def parse_config(d: bytes):
         sec_name=d2[i:i+10].decode().rstrip()
         mod_id=d2[i+11]
         sec_len=struct.unpack('>I', d2[i+12:i+16])[0]
-        module=module_tbl.get(mod_id, f"unknown: {mod_id}")
+        module=module_tbl[mod_id]
         print(f"section '{sec_name}', model {module}, section len {sec_len:#x}")
         if (sec_len == 0): break
         i += sec_len + 16 # skip our header and section
@@ -205,8 +216,8 @@ def parse_hfs(d: bytes):
     if (len(d) != expect_len):
         print(f"unexpected file size {len(d):#X} vs {expect_len:#X}")
         return
-    shortname = filetype_tbl.get(file_id, f"unknown: {file_id}")
-    print(f"type {file_id:#x}:{shortname}")
+    shortname = filetype_tbl[file_id].shortname
+    print(f"type {file_id}:{shortname}")
     # now, whatever it contains, must be also identified
     identify(d[0x200:])
     return
